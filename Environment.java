@@ -5,7 +5,7 @@ import java.util.Scanner;
  * Suporta simulações manuais, automáticas e comparativas entre diferentes agentes.
  */
 public class Environment {
-    private static final int MAX_STEPS = 1000;
+    private static final int MAX_STEPS = 50; // Limite de 50 passos
     private static final String[] DIRECTION_NAMES = {"up", "down", "left", "right"};
     
     private final Scanner scanner;
@@ -34,9 +34,9 @@ public class Environment {
         int initialDirtCount = world.getDirtyCount();
         long startTime = System.currentTimeMillis();
 
-        while (agent.getSteps() < MAX_STEPS && world.getDirtyCount() > 0) {
+        while (agent.getSteps() < MAX_STEPS) { // Remove condição de sujeira - sempre 50 passos
             if (!autoMode) {
-                System.out.println("\nPressione Enter para continuar...");
+                System.out.println("\nPressione Enter para continuar... (Passo " + (agent.getSteps() + 1) + "/" + MAX_STEPS + ")");
                 scanner.nextLine();
             } else {
                 sleep(delayMs);
@@ -50,12 +50,20 @@ public class Environment {
                 agent.setScore(agent.getScore() + 1);  // Remove penalidade
             }
 
-            System.out.println("Score: " + agent.getScore());
+            System.out.println("Score: " + agent.getScore() + " | Passos: " + agent.getSteps() + "/" + MAX_STEPS + " | Sujeira restante: " + world.getDirtyCount());
             world.printWorld();
 
             if (agent.getSteps() % 10 == 0) {
                 agent.printStats();
             }
+        }
+
+        // Sempre completa 50 passos
+        System.out.println("✅ SIMULAÇÃO CONCLUÍDA! Agente completou " + MAX_STEPS + " passos.");
+        if (world.getDirtyCount() == 0) {
+            System.out.println("🎉 BÔNUS: Todo o ambiente foi limpo durante os " + MAX_STEPS + " passos!");
+        } else {
+            System.out.println("🔄 Restam " + world.getDirtyCount() + " célula(s) sujas.");
         }
 
         long endTime = System.currentTimeMillis();
@@ -81,9 +89,9 @@ public class Environment {
         int initialDirtCount = world.getDirtyCount();
         long startTime = System.currentTimeMillis();
 
-        while (agent.getSteps() < MAX_STEPS && world.getDirtyCount() > 0) {
+        while (agent.getSteps() < MAX_STEPS) { // Remove condição de sujeira - sempre 50 passos
             if (!autoMode) {
-                System.out.println("\nPressione Enter para continuar...");
+                System.out.println("\nPressione Enter para continuar... (Passo " + (agent.getSteps() + 1) + "/" + MAX_STEPS + ")");
                 scanner.nextLine();
             } else {
                 sleep(delayMs);
@@ -91,9 +99,11 @@ public class Environment {
 
             int action = agent.chooseAction();
 
+            // Agente modelo pode decidir "não fazer nada" se quiser, mas ainda conta como passo
             if (action == -1) {
-                System.out.println("Agente decidiu parar.");
-                break;
+                System.out.println(agent.getName() + " escolheu não se mover neste turno.");
+                agent.setSteps(agent.getSteps() + 1); // Conta como passo mesmo sem movimento
+                continue;
             }
 
             boolean moveExecuted = executeMove(world, agent, action);
@@ -103,12 +113,20 @@ public class Environment {
                 agent.setScore(agent.getScore() + 1);
             }
 
-            System.out.println("Score: " + agent.getScore());
+            System.out.println("Score: " + agent.getScore() + " | Passos: " + agent.getSteps() + "/" + MAX_STEPS + " | Sujeira restante: " + world.getDirtyCount());
             world.printWorld();
 
             if (agent.getSteps() % 5 == 0) {
                 agent.printDetailedStatus();
             }
+        }
+
+        // Sempre completa 50 passos
+        System.out.println("✅ SIMULAÇÃO CONCLUÍDA! Agente completou " + MAX_STEPS + " passos.");
+        if (world.getDirtyCount() == 0) {
+            System.out.println("🎉 BÔNUS: Todo o ambiente foi limpo durante os " + MAX_STEPS + " passos!");
+        } else {
+            System.out.println("🔄 Restam " + world.getDirtyCount() + " célula(s) sujas.");
         }
 
         long endTime = System.currentTimeMillis();
@@ -173,7 +191,7 @@ public class Environment {
     }
 
     private void printComparison(SimulationResult reactive, SimulationResult model) {
-        System.out.println("\n📊 === RESULTADO DA COMPARAÇÃO ===");
+        System.out.println("\n📊 === RESULTADO DA COMPARAÇÃO (50 passos obrigatórios) ===");
         System.out.println("┌─────────────────────┬─────────────┬─────────────┐");
         System.out.println("│ Métrica             │ Reativo     │ Modelo      │");
         System.out.println("├─────────────────────┼─────────────┼─────────────┤");
@@ -185,10 +203,28 @@ public class Environment {
         System.out.println("└─────────────────────┴─────────────┴─────────────┘");
         System.out.println("* Eficiência = Sujeira Limpa / Passos");
         
-        // Determina vencedor
-        String winner = model.score > reactive.score ? "🧠 Agente Modelo" : 
-                       reactive.score > model.score ? "🤖 Agente Reativo" : "🤝 Empate";
+        // Lógica para determinar vencedor baseada em performance
+        String winner;
+        if (reactive.dirtCleaned != model.dirtCleaned) {
+            // Quem limpou mais sujeira vence
+            winner = model.dirtCleaned > reactive.dirtCleaned ? "🧠 Agente Modelo" : "🤖 Agente Reativo";
+        } else if (reactive.dirtCleaned == 0 && model.dirtCleaned == 0) {
+            // Se ninguém limpou nada, empate
+            winner = "🤝 Empate (ninguém limpou)";
+        } else {
+            // Se limparam a mesma quantidade, vence quem teve melhor score
+            winner = model.score > reactive.score ? "🧠 Agente Modelo" : 
+                    reactive.score > model.score ? "🤖 Agente Reativo" : "🤝 Empate";
+        }
+        
         System.out.println("\n🏆 Vencedor: " + winner);
+        
+        // Análise de eficiência
+        if (model.getEfficiency() > reactive.getEfficiency()) {
+            System.out.println("💡 Agente Modelo foi mais eficiente (limpou mais por passo)!");
+        } else if (reactive.getEfficiency() > model.getEfficiency()) {
+            System.out.println("💡 Agente Reativo foi mais eficiente (surpreendente!)");
+        }
     }
 
     /**
@@ -313,16 +349,16 @@ public class Environment {
         public void printDetailedReport() {
             System.out.println("\n📋 === RELATÓRIO FINAL ===");
             System.out.println("🤖 Agente: " + agentName);
-            System.out.println("👣 Total de passos: " + steps);
+            System.out.println("👣 Total de passos: " + steps + "/50 (COMPLETO)");
             System.out.println("🏆 Score final: " + score);
             System.out.println("🧹 Sujeira limpa: " + dirtCleaned);
             System.out.println("⏱️  Tempo total: " + timeMs + "ms");
             System.out.println("📈 Eficiência: " + String.format("%.3f", getEfficiency()));
             
             if (dirtCleaned > 0) {
-                System.out.println("✅ Sucesso na limpeza!");
+                System.out.println("✅ Status: SUJEIRA LIMPA DURANTE OS 50 PASSOS");
             } else {
-                System.out.println("❌ Nenhuma sujeira foi limpa.");
+                System.out.println("❌ Status: NENHUMA SUJEIRA LIMPA");
             }
             System.out.println("========================");
         }

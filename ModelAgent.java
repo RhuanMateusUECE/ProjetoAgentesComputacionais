@@ -33,7 +33,7 @@ public class ModelAgent {
         TARGETING_DIRT("Indo para sujeira conhecida"),
         EXPLORING("Explorando áreas desconhecidas"),
         BACKTRACKING("Retornando por áreas limpas"),
-        FINISHED("Trabalho concluído");
+        FINISHED("Movimento aleatório - trabalho concluído");
         
         private final String description;
         
@@ -118,11 +118,20 @@ public class ModelAgent {
             return backtrackDirection;
         }
         
-        // Fase 4: Terminou
+        // Fase 4: Se não há mais nada a fazer, move aleatoriamente (não para!)
         currentStrategy = AgentStrategy.FINISHED;
-        System.out.println("🎉 " + name + " terminou! Ambiente completamente explorado.");
-        this.setSteps(100);
-        return -1;
+        int randomDirection = moveRandomly();
+        if (randomDirection != -1) {
+            System.out.println(name + " não tem mais estratégia - movendo aleatoriamente");
+            executeAction(randomDirection);
+            return randomDirection;
+        }
+        
+        // Última opção: ficar parado (mas ainda conta como turno)
+        System.out.println(name + " está bloqueado - permanece na posição atual");
+        this.score += MOVEMENT_COST;
+        this.steps++;
+        return -1; // Sinaliza "não mover" mas ainda conta como passo
     }
 
     private Position findNearestDirt() {
@@ -242,6 +251,28 @@ public class ModelAgent {
         }
         
         return nearest;
+    }
+
+    // Novo método: movimento aleatório quando não há mais estratégia
+    private int moveRandomly() {
+        Position[] adjacentPositions = position.getAdjacentPositions();
+        java.util.List<Integer> validMoves = new java.util.ArrayList<>();
+        
+        // Encontra movimentos válidos (sem bater na parede)
+        for (int i = 0; i < adjacentPositions.length; i++) {
+            Position pos = adjacentPositions[i];
+            if (pos.isValid(worldRows, worldCols)) {
+                validMoves.add(i);
+            }
+        }
+        
+        if (validMoves.isEmpty()) {
+            return -1; // Nenhum movimento válido
+        }
+        
+        // Escolhe aleatoriamente entre os movimentos válidos
+        java.util.Random random = new java.util.Random();
+        return validMoves.get(random.nextInt(validMoves.size()));
     }
 
     private void executeAction(int direction) {
